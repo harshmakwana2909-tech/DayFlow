@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dayflow | HR Management</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #4F46E5; /* Indigo 600 */
+            --primary-light: #EEF2FF;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --bg-body: #f8fafc;
+            --sidebar-width: 280px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background: var(--bg-body); color: var(--text-main); height: 100vh; overflow: hidden; }
+
+        /* --- UTILITIES --- */
+        .hidden { display: none !important; }
+        .flex { display: flex; align-items: center; }
+        .btn { padding: 10px 16px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 0.9rem; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: #4338ca; }
+        .btn-ghost { background: transparent; color: var(--text-muted); }
+        .btn-ghost:hover { background: #f1f5f9; color: var(--text-main); }
+        
+        /* --- AUTH SCREEN --- */
+        #auth-screen { position: absolute; inset: 0; background: linear-gradient(135deg, #4F46E5, #818CF8); z-index: 100; display: flex; justify-content: center; align-items: center; }
+        .auth-card { background: white; padding: 40px; border-radius: 20px; width: 100%; max-width: 400px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); text-align: center; }
+        .auth-input { width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 8px; outline: none; }
+        .auth-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-light); }
+
+        /* --- LAYOUT STRUCTURE --- */
+        #app-screen { display: flex; width: 100%; height: 100%; }
+
+        /* 1. SIDEBAR */
+        aside {
+            width: var(--sidebar-width); background: white; border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; height: 100%; transition: transform 0.3s ease;
+            position: relative; z-index: 50;
+        }
+        
+        .brand { padding: 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+        .brand-logo { width: 36px; height: 36px; background: var(--primary); border-radius: 8px; color: white; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 1.2rem; }
+        
+        .nav-menu { padding: 16px; flex: 1; overflow-y: auto; }
+        .nav-item {
+            padding: 12px 16px; margin-bottom: 4px; border-radius: 8px; cursor: pointer;
+            color: var(--text-muted); font-weight: 500; display: flex; align-items: center; gap: 12px; transition: all 0.2s;
+        }
+        .nav-item:hover { background: var(--bg-body); color: var(--text-main); }
+        .nav-item.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+        .nav-item i { width: 20px; text-align: center; }
+
+        .user-footer { padding: 16px; border-top: 1px solid var(--border); background: #f8fafc; }
+        .user-card { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 8px; background: white; border: 1px solid var(--border); }
+        .avatar { width: 40px; height: 40px; background: #e2e8f0; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; color: var(--text-muted); }
+
+        /* 2. MAIN CONTENT AREA */
+        .main-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+        /* 3. HEADER */
+        header {
+            height: 70px; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border); padding: 0 30px;
+            display: flex; justify-content: space-between; align-items: center;
+            position: relative; z-index: 40;
+        }
+        .header-left h2 { font-size: 1.1rem; font-weight: 600; }
+        .header-date { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
+        
+        .header-actions { display: flex; gap: 15px; position: relative; }
+        .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); display: flex; justify-content: center; align-items: center; cursor: pointer; background: white; position: relative; }
+        .icon-btn:hover { background: var(--bg-body); }
+        
+        /* FIX: Badge is now hidden by default */
+        .badge-dot { 
+            position: absolute; top: -2px; right: -2px; width: 10px; height: 10px; 
+            background: #ef4444; border-radius: 50%; border: 2px solid white; 
+            display: none; /* Hidden unless JS enables it */
+        }
+
+        /* NOTIFICATION DROPDOWN */
+        .notif-dropdown {
+            position: absolute; top: 50px; right: 0; width: 320px;
+            background: white; border: 1px solid var(--border); border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15); z-index: 1000;
+            display: none; overflow: hidden;
+        }
+        .notif-dropdown.show { display: block; animation: fadeIn 0.2s ease-out; }
+        .notif-header { padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 600; display: flex; justify-content: space-between; background: #f8fafc; }
+        .notif-item { padding: 12px 16px; border-bottom: 1px solid var(--border); transition: background 0.2s; }
+        .notif-item:hover { background: #f1f5f9; }
+        .notif-title { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px; }
+        .notif-desc { font-size: 0.85rem; color: var(--text-main); font-weight: 500; }
+
+        /* 4. CONTENT VIEWS */
+        main { flex: 1; padding: 30px; overflow-y: auto; }
+        
+        .content-card { background: white; border-radius: 16px; border: 1px solid var(--border); padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+        
+        /* Stats Grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 24px; }
+        .stat-box { background: white; border: 1px solid var(--border); padding: 20px; border-radius: 12px; }
+        .stat-title { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
+        .stat-value { font-size: 2rem; font-weight: 700; color: var(--text-main); margin-top: 5px; }
+
+        /* Tables */
+        table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        th { text-align: left; padding: 16px; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.85rem; font-weight: 600; }
+        td { padding: 16px; border-bottom: 1px solid var(--border); color: var(--text-main); font-size: 0.95rem; }
+        .status-pill { padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+        .bg-green { background: #dcfce7; color: #166534; }
+        .bg-yellow { background: #fef9c3; color: #854d0e; }
+        .bg-red { background: #fee2e2; color: #991b1b; }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            aside { position: fixed; transform: translateX(-100%); height: 100%; box-shadow: 5px 0 15px rgba(0,0,0,0.1); }
+            aside.open { transform: translateX(0); }
+            .mobile-toggle { display: block !important; }
+        }
+        .mobile-toggle { display: none; font-size: 1.5rem; cursor: pointer; margin-right: 15px; }
+
+    </style>
+</head>
+<body>
+
+    <div id="auth-screen">
+        <div class="auth-card animate__animated animate__fadeInUp">
+            <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+                <div class="brand-logo" style="width: 50px; height: 50px; font-size: 1.5rem;">D</div>
+            </div>
+            <h2 id="auth-title" style="margin-bottom: 10px;">Welcome Back</h2>
+            <p style="color: var(--text-muted); margin-bottom: 24px;">Enter your credentials to access your account.</p>
+            
+            <form onsubmit="event.preventDefault(); handleAuth();">
+                <input type="text" id="reg-name" placeholder="Full Name" class="auth-input hidden">
+                <input type="email" id="email" placeholder="name@company.com" class="auth-input" required>
+                <input type="password" id="password" placeholder="Password" class="auth-input" required>
+                <select id="role-select" class="auth-input hidden">
+                    <option value="employee">Employee</option>
+                    <option value="admin">Admin / HR</option>
+                </select>
+                <button class="btn btn-primary" style="width: 100%; padding: 12px;">Sign In</button>
+            </form>
+            <div style="margin-top: 20px; font-size: 0.9rem;">
+                <a href="#" onclick="toggleAuthMode()" id="toggle-text" style="color: var(--primary); text-decoration: none;">Create an account</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-screen" class="hidden">
+        
+        <aside id="sidebar">
+            <div class="brand">
+                <div class="brand-logo">D</div>
+                <div>
+                    <div style="font-weight: 700;">Dayflow</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">HR Management</div>
+                </div>
+                <i class="fas fa-times mobile-toggle" style="margin-left: auto;" onclick="toggleSidebar()"></i>
+            </div>
+
+            <div class="nav-menu">
+                <div class="nav-item active" onclick="nav('dashboard', this)">
+                    <i class="fas fa-border-all"></i> <span>Dashboard</span>
+                </div>
+                <div class="nav-item" onclick="nav('profile', this)">
+                    <i class="fas fa-user"></i> <span>My Profile</span>
+                </div>
+                <div class="nav-item" onclick="nav('attendance', this)">
+                    <i class="fas fa-clock"></i> <span>Attendance</span>
+                </div>
+                <div class="nav-item" onclick="nav('leaves', this)">
+                    <i class="fas fa-calendar-alt"></i> <span>Leaves</span>
+                </div>
+                <div class="nav-item" onclick="nav('payroll', this)">
+                    <i class="fas fa-file-invoice-dollar"></i> <span>Payroll</span>
+                </div>
+                <div id="admin-nav" class="hidden">
+                    <div style="margin: 20px 0 10px 10px; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">HR Management</div>
+                    <div class="nav-item" onclick="nav('employees', this)">
+                        <i class="fas fa-users"></i> <span>Employees</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="user-footer">
+                <div class="user-card">
+                    <div class="avatar" id="sidebar-avatar">U</div>
+                    <div style="flex: 1; overflow: hidden;">
+                        <div id="sidebar-name" style="font-weight: 600; font-size: 0.9rem; white-space: nowrap;">User</div>
+                        <div id="sidebar-role" style="font-size: 0.75rem; color: var(--text-muted);">Role</div>
+                    </div>
+                    <i class="fas fa-sign-out-alt" onclick="location.reload()" style="cursor: pointer; color: #ef4444;" title="Sign Out"></i>
+                </div>
+            </div>
+        </aside>
+
+        <div class="main-wrapper">
+            <header>
+                <div class="flex">
+                    <i class="fas fa-bars mobile-toggle" onclick="toggleSidebar()"></i>
+                    <div class="header-left">
+                        <h2 id="header-welcome">Welcome back!</h2>
+                        <div class="header-date" id="current-date">Fetching date...</div>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <div class="icon-btn" onclick="toggleNotifications()" id="notif-btn">
+                        <i class="far fa-bell" style="color: #64748b;"></i>
+                        <span class="badge-dot" id="notif-badge"></span>
+                    </div>
+                    <div id="notif-menu" class="notif-dropdown">
+                        <div class="notif-header">
+                            <span>Notifications</span>
+                            <span style="font-size: 0.75rem; color: var(--primary); cursor: pointer;" onclick="toggleNotifications()">Close</span>
+                        </div>
+                        <div id="notif-list"></div>
+                    </div>
+
+                    <div class="icon-btn" onclick="nav('profile', document.querySelectorAll('.nav-item')[1])">
+                        <i class="far fa-user" style="color: #64748b;"></i>
+                    </div>
+                </div>
+            </header>
+
+            <main>
+                <div id="view-dashboard" class="animate__animated animate__fadeIn">
+                    <div class="stats-grid" id="stats-area"></div>
+                    <div class="content-card hidden" id="admin-emp-list">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                            <h3>Recent Employees</h3>
+                            <button class="btn btn-ghost">View All</button>
+                        </div>
+                        <table id="emp-table"></table>
+                    </div>
+                    <div class="content-card" id="user-notice">
+                        <h3>📢 Announcement</h3>
+                        <p style="color: var(--text-muted); margin-top: 10px;">The payroll system has been updated for the new fiscal year. Please check your latest salary slip.</p>
+                    </div>
+                </div>
+
+                <div id="view-profile" class="hidden animate__animated animate__fadeIn">
+                    <div class="content-card" style="max-width: 600px;">
+                        <h3 style="margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">Profile Settings</h3>
+                        <form id="profile-form">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 500;">Full Name</label>
+                            <input type="text" id="p-name-disp" class="auth-input" disabled style="background: #f1f5f9;">
+                            
+                            <label style="display: block; margin-bottom: 5px; font-weight: 500;">Email Address</label>
+                            <input type="text" id="p-email" class="auth-input" disabled style="background: #f1f5f9;">
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: 500;">Phone Number</label>
+                                    <input type="text" id="p-phone" class="auth-input" placeholder="+1 234...">
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: 500;">Location / Address</label>
+                                    <input type="text" id="p-address" class="auth-input" placeholder="City, Country">
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-primary" style="margin-top: 10px;" onclick="updateProfile()">Save Changes</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="view-attendance" class="hidden animate__animated animate__fadeIn">
+                    <div class="content-card flex" style="justify-content: space-between;" id="attend-action-card">
+                        <div>
+                            <h3>Mark Attendance</h3>
+                            <p style="color: var(--text-muted);">Record your daily check-in and check-out time.</p>
+                        </div>
+                        <button class="btn btn-primary" id="btn-check" onclick="markAttendance()" style="min-width: 120px;">Check In</button>
+                    </div>
+                    <div class="content-card">
+                        <h3>Attendance History</h3>
+                        <div style="overflow-x: auto;">
+                            <table id="attend-table"></table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-leaves" class="hidden animate__animated animate__fadeIn">
+                    <div class="content-card" id="leave-form-card">
+                        <h3>Request Time Off</h3>
+                        <form onsubmit="event.preventDefault(); applyLeave();" style="margin-top: 15px;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                                <select id="l-type" class="auth-input"><option>Sick Leave</option><option>Casual Leave</option></select>
+                                <input type="date" id="l-start" class="auth-input" required>
+                                <input type="date" id="l-end" class="auth-input" required>
+                            </div>
+                            <input type="text" id="l-rem" class="auth-input" placeholder="Reason for leave..." required>
+                            <button class="btn btn-primary">Submit Request</button>
+                        </form>
+                    </div>
+                    <div class="content-card">
+                        <h3>Leave Requests</h3>
+                        <table id="leave-table"></table>
+                    </div>
+                </div>
+
+                <div id="view-payroll" class="hidden animate__animated animate__fadeIn">
+                    <div class="content-card" style="max-width: 500px;">
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <div style="font-size: 2rem; font-weight: 700; color: var(--text-main);" id="pay-net">$0.00</div>
+                            <div style="color: var(--text-muted);">Net Salary (Current Month)</div>
+                        </div>
+                        <div style="border-top: 1px dashed var(--border); padding-top: 15px;">
+                            <div class="flex" style="justify-content: space-between; margin-bottom: 10px;">
+                                <span>Basic Pay</span> <span style="font-weight: 600;" id="pay-base">$0.00</span>
+                            </div>
+                            <div class="flex" style="justify-content: space-between; margin-bottom: 10px;">
+                                <span>HRA & Allowances</span> <span style="font-weight: 600; color: #166534;">+$500.00</span>
+                            </div>
+                            <div class="flex" style="justify-content: space-between; margin-bottom: 10px;">
+                                <span>Tax Deductions</span> <span style="font-weight: 600; color: #991b1b;">-$200.00</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-ghost" style="width: 100%; margin-top: 10px;" onclick="downloadSlip()">Download Slip <i class="fas fa-download"></i></button>
+                    </div>
+                </div>
+
+                <div id="view-employees" class="hidden animate__animated animate__fadeIn">
+                    <div class="content-card">
+                        <h3>All Employees</h3>
+                        <table id="full-emp-table"></table>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://localhost:3000/api';
+        let user = null;
+        let isSignup = false;
+        let latestNotifId = 0; // Track latest notification ID
+
+        // Init Date
+        document.getElementById('current-date').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        // Sidebar Toggle
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        // Smart Notification Check
+        async function checkNotifications() {
+            try {
+                const res = await fetch(`${API}/notifications?email=${user.email}`);
+                const data = await res.json();
+                const badge = document.getElementById('notif-badge');
+
+                if (data.length > 0) {
+                    latestNotifId = data[0].id;
+                    const lastSeen = localStorage.getItem('last_seen_notif');
+                    
+                    // Show dot if latest notification is newer than last seen
+                    if (!lastSeen || latestNotifId > parseInt(lastSeen)) {
+                        badge.style.display = 'block';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                } else {
+                    badge.style.display = 'none';
+                }
+            } catch (e) { console.error("Notif Error", e); }
+        }
+
+        // Notification Toggle
+        async function toggleNotifications() {
+            const menu = document.getElementById('notif-menu');
+            const badge = document.getElementById('notif-badge');
+            
+            menu.classList.toggle('show');
+
+            if (menu.classList.contains('show')) {
+                // Mark as read locally
+                if (latestNotifId > 0) {
+                    localStorage.setItem('last_seen_notif', latestNotifId);
+                    badge.style.display = 'none';
+                }
+
+                const list = document.getElementById('notif-list');
+                list.innerHTML = '<div class="notif-item"><div class="notif-desc">Loading...</div></div>';
+
+                try {
+                    const res = await fetch(`${API}/notifications?email=${user.email}`);
+                    const data = await res.json();
+
+                    if (data.length === 0) {
+                        list.innerHTML = '<div class="notif-item"><div class="notif-desc">No new notifications</div></div>';
+                    } else {
+                        list.innerHTML = data.map(n => `
+                            <div class="notif-item">
+                                <div class="notif-title">${n.date}</div>
+                                <div class="notif-desc">${n.message}</div>
+                            </div>
+                        `).join('');
+                    }
+                } catch (e) {
+                    list.innerHTML = '<div class="notif-item"><div class="notif-desc" style="color:red">Failed to load</div></div>';
+                }
+            }
+        }
+
+        window.addEventListener('click', function(e) {
+            const menu = document.getElementById('notif-menu');
+            const btn = document.getElementById('notif-btn');
+            if (!menu.contains(e.target) && !btn.contains(e.target)) {
+                menu.classList.remove('show');
+            }
+        });
+
+        // PDF Generation
+        async function downloadSlip() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const primaryColor = [79, 70, 229];
+
+            doc.setFontSize(22);
+            doc.setTextColor(...primaryColor);
+            doc.text("Dayflow HRMS", 14, 20);
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text("123 Tech Street, Silicon Valley, CA", 14, 26);
+            doc.text("support@dayflow.com | +1 555-0199", 14, 31);
+            doc.setFontSize(16);
+            doc.setTextColor(0);
+            doc.text("PAYSLIP", 160, 22);
+            doc.setFontSize(10);
+            doc.text("January 2026", 160, 28);
+            doc.setDrawColor(200);
+            doc.line(14, 36, 196, 36);
+
+            doc.setFontSize(11);
+            doc.text(`Employee Name: ${user.name}`, 14, 45);
+            doc.text(`Employee ID: DF-${user.id.toString().padStart(4, '0')}`, 14, 51);
+            doc.text(`Designation: ${user.job_title}`, 14, 57);
+            doc.text(`Email: ${user.email}`, 14, 63);
+
+            const basic = user.salary;
+            const hra = 500;
+            const tax = 200;
+            const totalEarnings = basic + hra;
+            const totalDeductions = tax;
+            const netPay = totalEarnings - totalDeductions;
+
+            doc.autoTable({
+                startY: 70,
+                head: [['EARNINGS', 'AMOUNT', 'DEDUCTIONS', 'AMOUNT']],
+                body: [
+                    ['Basic Salary', `$${basic.toLocaleString()}`, 'Tax Deductions', `$${tax.toLocaleString()}`],
+                    ['HRA & Allowances', `$${hra.toLocaleString()}`, '', ''],
+                    ['', '', '', ''],
+                    [{content: 'Total Earnings', styles: {fontStyle: 'bold'}}, `$${totalEarnings.toLocaleString()}`, {content: 'Total Deductions', styles: {fontStyle: 'bold'}}, `$${totalDeductions.toLocaleString()}`],
+                ],
+                theme: 'grid',
+                headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold' },
+                styles: { fontSize: 10, cellPadding: 4 }
+            });
+
+            const finalY = doc.lastAutoTable.finalY + 15;
+            doc.setFillColor(245, 247, 255);
+            doc.rect(14, finalY, 182, 20, 'F');
+            doc.setFontSize(12);
+            doc.setTextColor(0);
+            doc.text("Net Payable Amount:", 20, finalY + 13);
+            doc.setFontSize(18);
+            doc.setTextColor(...primaryColor);
+            doc.setFont("helvetica", "bold");
+            doc.text(`$${netPay.toLocaleString()}`, 150, finalY + 13);
+            doc.setFontSize(9);
+            doc.setTextColor(150);
+            doc.setFont("helvetica", "normal");
+            doc.text("This is a computer-generated document.", 105, 280, { align: "center" });
+
+            doc.save(`Payslip_${user.name.split(' ')[0]}_Jan2026.pdf`);
+        }
+
+        // Auth Logic
+        function toggleAuthMode() {
+            isSignup = !isSignup;
+            document.getElementById('auth-title').innerText = isSignup ? "Create Account" : "Welcome Back";
+            document.getElementById('toggle-text').innerText = isSignup ? "Already have an account? Sign In" : "Create an account";
+            document.getElementById('reg-name').classList.toggle('hidden');
+            document.getElementById('role-select').classList.toggle('hidden');
+        }
+
+        async function handleAuth() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if(isSignup) {
+                const name = document.getElementById('reg-name').value;
+                const role = document.getElementById('role-select').value;
+                await fetch(`${API}/register`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ name, email, password, role })
+                });
+                alert("Account created! Please login.");
+                toggleAuthMode();
+            } else {
+                const res = await fetch(`${API}/login`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if(data.success) {
+                    user = data.user;
+                    initApp();
+                } else alert("Invalid credentials");
+            }
+        }
+
+        function initApp() {
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('app-screen').classList.remove('hidden');
+            
+            document.getElementById('header-welcome').innerText = `Welcome back, ${user.name.split(' ')[0]}!`;
+            document.getElementById('sidebar-name').innerText = user.name;
+            document.getElementById('sidebar-role').innerText = user.role.toUpperCase();
+            document.getElementById('sidebar-avatar').innerText = user.name.charAt(0);
+            document.getElementById('p-name-disp').value = user.name;
+            document.getElementById('p-email').value = user.email;
+            document.getElementById('p-phone').value = user.phone || '';
+            document.getElementById('p-address').value = user.address || '';
+            document.getElementById('pay-base').innerText = "$" + user.salary;
+            document.getElementById('pay-net').innerText = "$" + (user.salary + 300);
+
+            if(user.role === 'admin') {
+                document.getElementById('admin-nav').classList.remove('hidden');
+                document.getElementById('attend-action-card').classList.add('hidden');
+                document.getElementById('leave-form-card').classList.add('hidden');
+                document.getElementById('admin-emp-list').classList.remove('hidden');
+                document.getElementById('user-notice').classList.add('hidden');
+                loadEmployeeList();
+            }
+            loadData();
+            checkNotifications(); // Check for dots on load
+        }
+
+        function nav(viewId, el) {
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            if(el) el.classList.add('active');
+            document.querySelectorAll('main > div').forEach(d => d.classList.add('hidden'));
+            document.getElementById('view-' + viewId).classList.remove('hidden');
+            if(window.innerWidth < 768) toggleSidebar();
+        }
+
+        async function loadData() {
+            const attRes = await fetch(`${API}/attendance?role=${user.role}&email=${user.email}`);
+            const attData = await attRes.json();
+            const statsArea = document.getElementById('stats-area');
+            
+            if(user.role === 'admin') {
+                statsArea.innerHTML = `<div class="stat-box"><div class="stat-title">Total Staff</div><div class="stat-value">12</div></div><div class="stat-box"><div class="stat-title">Attendance</div><div class="stat-value">${attData.length}</div></div><div class="stat-box"><div class="stat-title">Departments</div><div class="stat-value">4</div></div>`;
+            } else {
+                statsArea.innerHTML = `<div class="stat-box"><div class="stat-title">Present Days</div><div class="stat-value">${attData.length}</div></div><div class="stat-box"><div class="stat-title">Leave Balance</div><div class="stat-value">18</div></div><div class="stat-box"><div class="stat-title">Net Pay</div><div class="stat-value" style="color:#16a34a;">$${user.salary+300}</div></div>`;
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+            const log = attData.find(r => r.date === today && r.user_email === user.email);
+            const btn = document.getElementById('btn-check');
+            if(log && log.time_out === '-') {
+                btn.innerText = "Check Out"; btn.style.background = "#ef4444";
+            } else {
+                btn.innerText = "Check In"; btn.style.background = "var(--primary)";
+            }
+
+            let html = `<thead><tr><th>Date</th><th>Name</th><th>Status</th><th>In</th><th>Out</th></tr></thead><tbody>`;
+            attData.forEach(r => {
+                const badge = r.status === 'Present' ? 'bg-green' : 'bg-red';
+                html += `<tr><td>${r.date}</td><td>${user.role==='admin'?r.user_email.split('@')[0]:'Me'}</td><td><span class="status-pill ${badge}">${r.status}</span></td><td>${r.time_in}</td><td>${r.time_out}</td></tr>`;
+            });
+            document.getElementById('attend-table').innerHTML = html + "</tbody>";
+
+            const lRes = await fetch(`${API}/leaves?role=${user.role}&email=${user.email}`);
+            const lData = await lRes.json();
+            let lHtml = `<thead><tr><th>Name</th><th>Type</th><th>From</th><th>To</th><th>Status</th><th>Action</th></tr></thead><tbody>`;
+            lData.forEach(r => {
+                let badge = 'bg-yellow';
+                if(r.status === 'Approved') badge = 'bg-green';
+                if(r.status === 'Rejected') badge = 'bg-red';
+                let action = '';
+                if(user.role === 'admin' && r.status === 'Pending') {
+                    action = `<button class="btn btn-primary" style="padding:4px 10px; font-size:0.75rem;" onclick="updLeave(${r.id}, 'Approved')">Approve</button> <button class="btn" style="background:#fee2e2; color:#991b1b; padding:4px 10px; font-size:0.75rem;" onclick="updLeave(${r.id}, 'Rejected')">Reject</button>`;
+                }
+                lHtml += `<tr><td>${r.name}</td><td>${r.type}</td><td>${r.start_date}</td><td>${r.end_date}</td><td><span class="status-pill ${badge}">${r.status}</span></td><td>${action}</td></tr>`;
+            });
+            document.getElementById('leave-table').innerHTML = lHtml + "</tbody>";
+        }
+
+        async function loadEmployeeList() {
+            const res = await fetch(`${API}/users?role=admin`);
+            const users = await res.json();
+            let html = `<thead><tr><th>Name</th><th>Email</th><th>Job Title</th><th>Salary</th></tr></thead><tbody>`;
+            users.forEach(u => {
+                html += `<tr><td><div class="flex" style="gap:10px;"><div class="avatar" style="width:30px; height:30px; font-size:0.8rem;">${u.name.charAt(0)}</div> ${u.name}</div></td><td>${u.email}</td><td>${u.job_title}</td><td>$${u.salary}</td></tr>`;
+            });
+            document.getElementById('emp-table').innerHTML = html + "</tbody>";
+            document.getElementById('full-emp-table').innerHTML = html + "</tbody>";
+        }
+
+        async function updateProfile() {
+            const phone = document.getElementById('p-phone').value;
+            const address = document.getElementById('p-address').value;
+            await fetch(`${API}/profile`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email: user.email, phone, address }) });
+            alert("Profile Updated Successfully!");
+            user.phone = phone; user.address = address;
+        }
+
+        async function markAttendance() {
+            const btn = document.getElementById('btn-check');
+            const isCheckIn = btn.innerText === "Check In";
+            await fetch(`${API}/attendance`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ user_email: user.email, date: new Date().toISOString().split('T')[0], status: 'Present', time_in: isCheckIn ? new Date().toLocaleTimeString() : '-', time_out: isCheckIn ? '-' : new Date().toLocaleTimeString() }) });
+            loadData();
+        }
+
+        async function applyLeave() {
+            await fetch(`${API}/leaves`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ user_email: user.email, name: user.name, type: document.getElementById('l-type').value, start_date: document.getElementById('l-start').value, end_date: document.getElementById('l-end').value, remarks: document.getElementById('l-rem').value }) });
+            alert("Leave Request Sent");
+            loadData();
+            checkNotifications(); // Refresh notifications immediately
+        }
+
+        async function updLeave(id, status) {
+            await fetch(`${API}/leaves/${id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ status }) });
+            loadData();
+            checkNotifications();
+        }
+    </script>
+</body>
+</html>
